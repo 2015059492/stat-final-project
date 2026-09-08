@@ -1,0 +1,30 @@
+---
+title: "Final Project Report"
+author: "Thembisile Buthelezi"
+format: html
+---
+
+# Introduction
+
+This section will introduce the final project and its main purpose.
+
+# Data
+
+This section will describe the data used in the project.
+
+# Methods
+
+This section will explain the statistical methods used in the analysis.
+
+# Results
+
+This section will present the results of the analysis.
+
+```{python}
+x = 2 + 2
+print("Test calculation:", x)
+```
+
+# Reproducibility
+
+This section will provide information needed to reproduce the analysis.
