@@ -28,3 +28,11 @@ print("Test calculation:", x)
 # Reproducibility
 
 This section will provide information needed to reproduce the analysis.
+
+```{python}
+import sys
+import platform
+
+print("Python version:", sys.version)
+print("Operating system:", platform.platform())
+```
