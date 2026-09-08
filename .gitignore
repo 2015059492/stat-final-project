@@ -2,3 +2,4 @@ output/
 *.html
 .DS_Store
 .Rproj.user/
+report_files/
