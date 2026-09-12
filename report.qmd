@@ -54,3 +54,5 @@ for folder in required_folders:
 ```
 
 If all three folders are found, the basic project structure is available for the analysis. If a folder is missing, this check makes the problem visible before later code depends on it.
+
+To test portability, I also rendered this project in a GitHub Codespace, which uses a Linux environment. The first render attempt did not work because Quarto was not installed in the Codespace. I installed Quarto 1.10.18 and the report then rendered successfully. During this test, I also noticed that the empty output folder was not included when the repository was cloned, so I added a .gitkeep file to make sure the folder is preserved. After these changes, the report rendered successfully in the Codespace.
