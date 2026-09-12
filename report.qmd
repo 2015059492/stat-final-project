@@ -39,3 +39,18 @@ print("Operating system:", platform.platform())
 ```
 
 These details document the computing environment used for the analysis and can help identify differences if the report is run on another machine.
+The following check confirms that the main project folders needed for the analysis are present. This helps verify that the repository has the expected structure when it is cloned or moved to another computer.
+
+```{python}
+from pathlib import Path
+
+required_folders = ["data", "py", "output"]
+
+for folder in required_folders:
+    if Path(folder).exists():
+        print(folder, "folder found")
+    else:
+        print(folder, "folder missing")
+```
+
+If all three folders are found, the basic project structure is available for the analysis. If a folder is missing, this check makes the problem visible before later code depends on it.
