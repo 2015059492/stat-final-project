@@ -9,3 +9,4 @@ To render the report, run:
 ```bash
 quarto render report.qmd --to html
 ```
+A feature branch named reproducibility-checks was used to add a project-structure check so the report can verify that the required folders are present after the repository is cloned.
