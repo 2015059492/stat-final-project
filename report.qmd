@@ -18,16 +18,17 @@ This section will explain the statistical methods used in the analysis.
 
 # Results
 
-This section will present the results of the analysis.
+This section will present the results of the analysis. For now, the code below performs a simple calculation to confirm that Python code runs correctly when the Quarto report is rendered.
 
 ```{python}
 x = 2 + 2
 print("Test calculation:", x)
 ```
+The result should be 4. This confirms that the report can execute Python code successfully.
 
 # Reproducibility
 
-This section will provide information needed to reproduce the analysis.
+This section records information needed to reproduce the analysis. The code below prints the Python version and operating system used to render the report.
 
 ```{python}
 import sys
@@ -36,3 +37,5 @@ import platform
 print("Python version:", sys.version)
 print("Operating system:", platform.platform())
 ```
+
+These details document the computing environment used for the analysis and can help identify differences if the report is run on another machine.
