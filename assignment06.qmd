@@ -1,0 +1,400 @@
+---
+title: "Assignment 06: Simulation Study Design"
+author: "Thembisile Buthelezi"
+format: html
+---
+# Simulation Study Design
+
+## The Question, Made Precise
+
+This simulation study will evaluate the performance of a standard regression model across different sample sizes when the true effect of the predictor is null (`β = 0`), small (`β = 0.10`), or medium (`β = 0.30`). I will estimate statistical power for the nonzero effects and the false-positive rate when the true effect is zero. The results will be used to determine the smallest sample size that provides adequate power while maintaining an acceptable false-positive rate.
+
+## Data-Generating Model
+
+The simulated data will follow a standard linear regression model:
+
+$$
+Y_i = \beta_0 + \beta_1 X_i + \epsilon_i
+$$
+
+where
+
+$$
+\epsilon_i \sim N(0,\sigma^2).
+$$
+
+The predictor $X_i$ will be generated from a standard normal distribution, $X_i \sim N(0,1)$. I will set the intercept to $\beta_0 = 0$ because the main focus of the simulation is the slope coefficient rather than the average level of the outcome.
+
+The focal slope, $\beta_1$, will take values of $0$, $0.10$, and $0.30$, representing the null, small, and medium effect conditions. The residual variance will be set to $\sigma^2 = 1$, which keeps the model on a simple standardized scale and allows the effect-size conditions to be compared directly.
+
+## Condition Grid
+
+The simulation will vary two design factors: sample size and the true value of the slope coefficient. I will use four sample sizes, `n = 50`, `100`, `200`, and `400`, together with the three effect-size conditions, `β = 0`, `0.10`, and `0.30`. This creates 12 simulation conditions in total.
+
+The smaller sample sizes allow me to examine settings where statistical power may be limited, while the larger sample sizes show how performance improves as more information becomes available.
+
+| Sample Size | Null Effect | Small Effect | Medium Effect |
+|---|---:|---:|---:|
+| 50  | β = 0.00 | β = 0.10 | β = 0.30 |
+| 100 | β = 0.00 | β = 0.10 | β = 0.30 |
+| 200 | β = 0.00 | β = 0.10 | β = 0.30 |
+| 400 | β = 0.00 | β = 0.10 | β = 0.30 |
+
+## Evaluation Criteria
+
+The primary evaluation criteria will be statistical power and the false-positive rate. For the nonzero effect conditions (`β = 0.10` and `β = 0.30`), I will define adequate performance as statistical power of at least 0.80. For the null condition (`β = 0`), I will evaluate whether the false-positive rate remains close to the nominal significance level of `α = 0.05`.
+
+I will also evaluate bias, 95% confidence-interval coverage, and the ratio of the mean analytical standard error to the empirical standard error. Bias will show whether the slope estimates systematically differ from the true value used to generate the data. Coverage will show whether the confidence intervals contain the true slope at approximately the expected 95% rate. The standard-error ratio will provide an additional check on whether the model-based standard errors accurately represent the actual sampling variability of the slope estimates.
+
+Including these additional criteria makes the power study stronger because sufficient power alone does not guarantee that the coefficient estimates or their reported uncertainty are behaving correctly.
+
+## Replication Count
+
+I will use `1,600` replications for each condition in the full simulation study. I chose this number so that the Monte Carlo standard error for the estimated power is approximately 0.01 or smaller when power is near the target value of 0.80.
+
+The Monte Carlo standard error for a proportion is
+
+$$
+MCSE = \sqrt{\frac{p(1-p)}{R}}
+$$
+
+where $p$ is the estimated proportion and $R$ is the number of replications. Solving for the number of replications when $p = 0.80$ and the desired Monte Carlo standard error is 0.01 gives
+
+$$
+R = \frac{0.80(1-0.80)}{0.01^2}
+= \frac{0.16}{0.0001}
+= 1600.
+$$
+
+With 1,600 replications, the Monte Carlo standard error for a false-positive rate of 0.05 is
+
+$$
+MCSE = \sqrt{\frac{0.05(0.95)}{1600}}
+\approx 0.0054.
+$$
+
+Therefore, 1,600 replications should provide sufficient precision for both the power and false-positive-rate estimates while remaining computationally manageable.
+
+## Prototype
+
+For the prototype, I will use one condition from the planned condition grid: a sample size of `n = 100` and a medium effect of `β = 0.30`. I will use 200 replications for this preliminary run and set a random seed to make the simulation reproducible.
+
+```{python}
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+rng = np.random.default_rng(1234)
+```
+```{python}
+def fit_matrix_regression(y, X):
+    y = np.asarray(y, dtype=float)
+    X = np.asarray(X, dtype=float)
+
+    if y.ndim != 1:
+        raise ValueError("Outcome y must be one-dimensional.")
+
+    if X.ndim != 2:
+        raise ValueError("Predictors X must be a two-dimensional matrix.")
+
+    if X.shape[0] != len(y):
+        raise ValueError(
+            "Outcome y and predictor matrix X must have the same number of observations."
+        )
+
+    if not np.all(np.isfinite(y)) or not np.all(np.isfinite(X)):
+        raise ValueError(
+            "Missing or non-finite values are not allowed in y or X."
+        )
+
+    X_design = np.column_stack(
+        [np.ones(X.shape[0]), X]
+    )
+
+    if np.linalg.matrix_rank(X_design) < X_design.shape[1]:
+        raise ValueError(
+            "The design matrix is rank-deficient; coefficients cannot be uniquely estimated."
+        )
+
+    n, p = X_design.shape
+
+    if n <= p:
+        raise ValueError(
+            "The model needs more observations than estimated parameters."
+        )
+
+    XtX = X_design.T @ X_design
+    Xty = X_design.T @ y
+
+    coefficients = np.linalg.solve(XtX, Xty)
+
+    fitted_values = X_design @ coefficients
+    residuals = y - fitted_values
+
+    residual_ss = residuals @ residuals
+    residual_df = n - p
+    residual_variance = residual_ss / residual_df
+
+    covariance_matrix = residual_variance * np.linalg.inv(XtX)
+    standard_errors = np.sqrt(np.diag(covariance_matrix))
+
+    t_statistics = coefficients / standard_errors
+
+    p_values = 2 * stats.t.sf(
+        np.abs(t_statistics),
+        df=residual_df
+    )
+
+    total_ss = np.sum(
+        (y - np.mean(y)) ** 2
+    )
+
+    r_squared = 1 - residual_ss / total_ss
+
+    model_df = p - 1
+    regression_ss = total_ss - residual_ss
+
+    f_statistic = (
+        (regression_ss / model_df) /
+        (residual_ss / residual_df)
+    )
+
+    return {
+        "coefficients": coefficients,
+        "standard_errors": standard_errors,
+        "residual_variance": residual_variance,
+        "fitted_values": fitted_values,
+        "t_statistics": t_statistics,
+        "p_values": p_values,
+        "f_statistic": f_statistic,
+        "r_squared": r_squared,
+        "residual_df": residual_df,
+        "model_df": model_df
+    }
+```
+
+The following function generates one dataset according to the data-generating model specified above. The predictor and residual error are generated from standard normal distributions, and the outcome is created using the specified value of the slope coefficient.
+
+```{python}
+def simulate_regression(n, beta1, rng):
+    x = rng.normal(0, 1, n)
+    error = rng.normal(0, 1, n)
+
+    y = beta1 * x + error
+
+    return pd.DataFrame({
+        "x": x,
+        "y": y
+    })
+```
+### Sanity Check
+
+Before running the repeated simulation, I generated one dataset from the prototype condition to confirm that the data-generating function produces the expected sample size and that the fitted regression slope is reasonably close to the true value of `β = 0.30`.
+
+```{python}
+prototype_data = simulate_regression(
+    n=100,
+    beta1=0.30,
+    rng=rng
+)
+
+X = prototype_data[["x"]].to_numpy()
+y = prototype_data["y"].to_numpy()
+
+model = fit_matrix_regression(y, X)
+
+print("Number of observations:", len(prototype_data))
+print("Estimated slope:", model["coefficients"][1])
+```
+### Repeated Simulation
+
+I then repeated the prototype condition 200 times. For each simulated dataset, I fitted the regression model and stored the estimated slope, its analytical standard error, the 95% confidence interval, and the p-value.
+
+```{python}
+rng_rep = np.random.default_rng(5678)
+
+n_replications = 200
+true_beta = 0.30
+
+simulation_results = []
+
+for i in range(n_replications):
+    data = simulate_regression(
+        n=100,
+        beta1=true_beta,
+        rng=rng_rep
+    )
+
+    X = data[["x"]].to_numpy()
+    y = data["y"].to_numpy()
+
+    fit = fit_matrix_regression(y, X)
+
+    estimate = fit["coefficients"][1]
+    se = fit["standard_errors"][1]
+    p_value = fit["p_values"][1]
+
+    t_critical = stats.t.ppf(
+        0.975,
+        df=fit["residual_df"]
+    )
+
+    ci_lower = estimate - t_critical * se
+    ci_upper = estimate + t_critical * se
+
+    simulation_results.append({
+        "estimate": estimate,
+        "se": se,
+        "ci_lower": ci_lower,
+        "ci_upper": ci_upper,
+        "p_value": p_value
+    })
+
+simulation_results = pd.DataFrame(simulation_results)
+
+simulation_results.head()
+```
+### Prototype Evaluation
+
+The prototype results were evaluated using statistical power, bias, confidence-interval coverage, and the agreement between the analytical and empirical standard errors. Because this condition has a nonzero true effect (`β = 0.30`), the proportion of statistically significant results represents statistical power rather than the false-positive rate.
+
+```{python}
+power = (simulation_results["p_value"] < 0.05).mean()
+
+bias = simulation_results["estimate"].mean() - true_beta
+
+empirical_se = simulation_results["estimate"].std()
+
+mean_analytical_se = simulation_results["se"].mean()
+
+se_ratio = mean_analytical_se / empirical_se
+
+coverage = (
+    (simulation_results["ci_lower"] <= true_beta) &
+    (simulation_results["ci_upper"] >= true_beta)
+).mean()
+
+evaluation_table = pd.DataFrame({
+    "sample_size": [100],
+    "true_beta": [true_beta],
+    "replications": [n_replications],
+    "power": [power],
+    "bias": [bias],
+    "empirical_se": [empirical_se],
+    "mean_analytical_se": [mean_analytical_se],
+    "se_ratio": [se_ratio],
+    "coverage": [coverage]
+})
+
+evaluation_table.round(3)
+
+```
+### Interpretation of the Prototype
+
+For the prototype condition with `n = 100` and `β = 0.30`, the estimated statistical power was 0.81, which is slightly above the target of 0.80. This suggests that a sample size of 100 may be sufficient to detect a medium effect under the simulated conditions.
+
+The estimated bias was approximately 0.002, indicating that the average estimated slope was very close to the true value of 0.30. The empirical standard error was 0.104, while the mean analytical standard error was 0.101, producing an SE ratio of approximately 0.969. This indicates that the model-based standard errors closely reflected the variability observed across the simulated estimates.
+
+The 95% confidence-interval coverage was 0.955, which is very close to the nominal target of 0.95. Overall, the prototype suggests that the simulation procedure is functioning as intended and can be extended to the remaining conditions in the planned design.
+
+## Stretch: Pilot Study
+
+To extend the prototype, I ran two conditions from the planned grid using 200 replications each. Both conditions used a sample size of `n = 100`, while the true slope varied between a small effect (`β = 0.10`) and a medium effect (`β = 0.30`). This comparison provides an initial indication of how strongly effect size influences statistical power under the same sample-size condition.
+
+```{python}
+def run_condition(n, beta1, replications, seed):
+    rng = np.random.default_rng(seed)
+
+    results = []
+
+    for i in range(replications):
+        data = simulate_regression(
+            n=n,
+            beta1=beta1,
+            rng=rng
+        )
+
+        X = data[["x"]].to_numpy()
+        y = data["y"].to_numpy()
+
+        fit = fit_matrix_regression(y, X)
+
+        estimate = fit["coefficients"][1]
+        se = fit["standard_errors"][1]
+        p_value = fit["p_values"][1]
+
+        t_critical = stats.t.ppf(
+            0.975,
+            df=fit["residual_df"]
+        )
+
+        ci_lower = estimate - t_critical * se
+        ci_upper = estimate + t_critical * se
+
+        results.append({
+            "estimate": estimate,
+            "se": se,
+            "ci_lower": ci_lower,
+            "ci_upper": ci_upper,
+            "p_value": p_value
+        })
+
+    results = pd.DataFrame(results)
+
+    power = (results["p_value"] < 0.05).mean()
+    bias = results["estimate"].mean() - beta1
+    empirical_se = results["estimate"].std()
+    mean_analytical_se = results["se"].mean()
+    se_ratio = mean_analytical_se / empirical_se
+
+    coverage = (
+        (results["ci_lower"] <= beta1) &
+        (results["ci_upper"] >= beta1)
+    ).mean()
+
+    return {
+        "sample_size": n,
+        "true_beta": beta1,
+        "replications": replications,
+        "power": power,
+        "bias": bias,
+        "empirical_se": empirical_se,
+        "mean_analytical_se": mean_analytical_se,
+        "se_ratio": se_ratio,
+        "coverage": coverage
+    }
+```
+### Pilot Comparison
+
+I applied the simulation function to the small-effect and medium-effect conditions at `n = 100`, using 200 replications for each condition.
+
+```{python}
+pilot_small = run_condition(
+    n=100,
+    beta1=0.10,
+    replications=200,
+    seed=1001
+)
+
+pilot_medium = run_condition(
+    n=100,
+    beta1=0.30,
+    replications=200,
+    seed=1002
+)
+
+pilot_table = pd.DataFrame([
+    pilot_small,
+    pilot_medium
+])
+
+pilot_table.round(3)
+```
+
+### Pilot Interpretation and Design Decision
+
+The pilot results showed a substantial difference in statistical power between the two effect-size conditions. With `n = 100`, power was approximately 0.195 for the small effect (`β = 0.10`) and approximately 0.855 for the medium effect (`β = 0.30`). This indicates that a sample size of 100 is sufficient to achieve the target power of 0.80 for the medium effect but is not sufficient for the small effect.
+
+Bias was approximately 0.002 in both conditions, indicating that the average estimated slopes were very close to their true values. The empirical standard errors were also similar across the two conditions, suggesting that the simulation procedure behaved consistently.
+
+The pilot did not lead to a revision of the planned design. Instead, the low power observed for the small effect at `n = 100` supports retaining the larger sample-size conditions already included in the original grid. The planned values of `n = 200` and `n = 400` are therefore important for determining how much the sample size must increase before the small effect reaches the target power of 0.80. For this reason, the original condition grid of `n = 50`, `100`, `200`, and `400` will be retained.
